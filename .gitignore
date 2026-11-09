@@ -18,3 +18,7 @@ npm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# 例外：验收样例是"故意做脏"的仓库，必须完整入库
+# （上面的 *.tmp 会误伤样例里的 notes.tmp，这是 CI 曾经红过的真实原因）
+!test/samples/**
