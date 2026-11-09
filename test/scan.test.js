@@ -71,7 +71,7 @@ test('样例：重复内容合并成一条，并列出全部副本', () => {
   assert.deepEqual(all, [
     'archive/design-v2.md',
     'docs/design-v2.md',
-    'notes/design-v2 副本.md'
+    'notes/design-v2-copy.md'
   ]);
 });
 
@@ -122,7 +122,7 @@ test('样例：临时产物命中且证据带真实大小', () => {
   const paths = temps.map((f) => f.path).sort();
   assert.deepEqual(paths, [
     'notes.tmp',
-    'notes/design-v2 副本.md',
+    'notes/design-v2-copy.md',
     'scratch-check.js',
     'src/api-old.js',
     'src/api.js.bak'

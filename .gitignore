@@ -1,24 +1,22 @@
+# 全部规则都锚定在仓库根（前导 /），只作用于本项目自己的产物。
+# 不使用 reports/、*.tmp 这类无锚定模式：它们会命中 test/samples 里刻意保留的样例文件
+# （这正是本仓库第一次 CI 挂掉的原因——样例缺文件，依赖它的用例连带失败）。
+
 # 运行时产物
-.tmp/
-hygiene-baseline.json
-reports/
+/.tmp/
+/hygiene-baseline.json
+/reports/
 
 # Node
-node_modules/
+/node_modules/
 npm-debug.log*
 
-# 临时 / 调试
-*.tmp
-.probe-*.py
-.patch-*.py
-.tmp-*.mjs
+# 临时 / 调试脚本（只针对根目录，样例里的 notes.tmp 必须保留）
+/.probe-*.py
+/.patch-*.py
 
 # 编辑器与系统
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-
-# 例外：验收样例是"故意做脏"的仓库，必须完整入库
-# （上面的 *.tmp 会误伤样例里的 notes.tmp，这是 CI 曾经红过的真实原因）
-!test/samples/**
