@@ -3,7 +3,7 @@
  * 覆盖退出码、输出格式、ack 的账本语义，以及"先固化基线再逐条裁决"这条推荐流程。
  */
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,14 +12,17 @@ import { fileURLToPath } from 'node:url';
 
 import { run } from '../src/cli.js';
 import { loadLedger } from '../src/ledger.js';
+import { createSandboxFactory } from './helpers/sandbox.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = path.join(HERE, 'samples', 'messy');
 const NOW = '2026-11-06T12:00:00Z';
+/** 所有临时仓库都建在同一根下，测试结束统一清理。 */
+const sandboxIn = createSandboxFactory(after);
 
 /** 造一个隔离工作目录，把样例复制进去，避免污染仓库。 */
-function sandbox() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aicg-cli-'));
+function sandbox(t) {
+  const dir = sandboxIn(t, 'cli');
   fs.cpSync(SAMPLE, path.join(dir, 'repo'), { recursive: true });
   return dir;
 }
@@ -47,22 +50,22 @@ const scanArgs = (dir, extra = []) => [
   'scan', '--root', path.join(dir, 'repo'), '--now', NOW, '--no-color', ...extra
 ];
 
-test('scan：有错误级问题时退出码为 1', () => {
-  const dir = sandbox();
+test('scan：有错误级问题时退出码为 1', (t) => {
+  const dir = sandbox(t);
   const { code, out } = capture(scanArgs(dir), { cwd: dir });
   assert.equal(code, 1);
   assert.match(out, /ERROR/);
   assert.match(out, /ai-code-hygiene v0\.1\.0/);
 });
 
-test('scan：--fail-on none 时永远 0；--fail-on warn 时警告也算失败', () => {
-  const dir = sandbox();
+test('scan：--fail-on none 时永远 0；--fail-on warn 时警告也算失败', (t) => {
+  const dir = sandbox(t);
   assert.equal(capture(scanArgs(dir, ['--fail-on', 'none']), { cwd: dir }).code, 0);
   assert.equal(capture(scanArgs(dir, ['--fail-on', 'warn']), { cwd: dir }).code, 1);
 });
 
-test('配置跟随 --root：被扫描仓库自己的配置生效，调用者的 cwd 不生效', () => {
-  const dir = sandbox();
+test('配置跟随 --root：被扫描仓库自己的配置生效，调用者的 cwd 不生效', (t) => {
+  const dir = sandbox(t);
   // 沙箱仓库根放一份"把 temp-file 关掉"的配置
   fs.writeFileSync(
     path.join(dir, 'repo', 'ai-hygiene.config.json'),
@@ -79,8 +82,8 @@ test('配置跟随 --root：被扫描仓库自己的配置生效，调用者的 
   );
 });
 
-test('--root 指向夹具目录时，不能被"夹具跳过"吞掉', () => {
-  const dir = sandbox();
+test('--root 指向夹具目录时，不能被"夹具跳过"吞掉', (t) => {
+  const dir = sandbox(t);
   // 沙箱根目录本身就叫 samples：默认 fixtureDirs 含 samples，但它就是扫描目标
   const nested = path.join(dir, 'samples', 'repo');
   fs.cpSync(SAMPLE, nested, { recursive: true });
@@ -89,8 +92,8 @@ test('--root 指向夹具目录时，不能被"夹具跳过"吞掉', () => {
   assert.match(out, /ERROR \(2\)/, '验收样例会故意保留两条断链');
 });
 
-test('scan：--severity 过滤后，标题里的分组计数同步（不能只过滤明细）', () => {
-  const dir = sandbox();
+test('scan：--severity 过滤后，标题里的分组计数同步（不能只过滤明细）', (t) => {
+  const dir = sandbox(t);
   const onlyError = capture(scanArgs(dir, ['--severity', 'error', '--fail-on', 'none']), { cwd: dir }).out;
   assert.match(onlyError, /ERROR \(2\)/);
   assert.doesNotMatch(onlyError, /WARN \(/);
@@ -109,8 +112,8 @@ test('scan：非法参数返回 2 而不是抛异常', () => {
   assert.equal(capture(['scan', '--baseline', 'missing.json']).code, 2);
 });
 
-test('scan：json 与 markdown 两种格式都可用', () => {
-  const dir = sandbox();
+test('scan：json 与 markdown 两种格式都可用', (t) => {
+  const dir = sandbox(t);
   const json = capture(scanArgs(dir, ['--format', 'json']), { cwd: dir });
   const parsed = JSON.parse(json.out);
   assert.ok(Array.isArray(parsed.findings));
@@ -123,8 +126,8 @@ test('scan：json 与 markdown 两种格式都可用', () => {
   assert.match(md.out, /\| 位置 \| 规则 \|/);
 });
 
-test('scan：--out 落盘，文件名 .json 时即使默认 text 格式也写 JSON', () => {
-  const dir = sandbox();
+test('scan：--out 落盘，文件名 .json 时即使默认 text 格式也写 JSON', (t) => {
+  const dir = sandbox(t);
   const dest = path.join(dir, 'reports', 'hygiene.json');
   const { code } = capture(scanArgs(dir, ['--out', dest]), { cwd: dir });
   assert.equal(code, 1);
@@ -132,8 +135,8 @@ test('scan：--out 落盘，文件名 .json 时即使默认 text 格式也写 JS
   assert.ok(parsed.findings.length > 0);
 });
 
-test('推荐流程：baseline 固化 → 扫描变干净 → ack 重开 → prune 清理', () => {
-  const dir = sandbox();
+test('推荐流程：baseline 固化 → 扫描变干净 → ack 重开 → prune 清理', (t) => {
+  const dir = sandbox(t);
   const ledger = path.join(dir, 'hygiene-baseline.json');
 
   // 1) 固化基线
@@ -181,8 +184,8 @@ test('推荐流程：baseline 固化 → 扫描变干净 → ack 重开 → prun
   assert.ok(!pruned.entries.some((e) => e.path === 'docs/api-summary.md'));
 });
 
-test('ack：缺少 --reason 时不写入账本（理由是这个工具的核心资产）', () => {
-  const dir = sandbox();
+test('ack：缺少 --reason 时不写入账本（理由是这个工具的核心资产）', (t) => {
+  const dir = sandbox(t);
   const ledger = path.join(dir, 'hygiene-baseline.json');
   const { code, err } = capture([
     'ack', '--root', path.join(dir, 'repo'), '--path', 'notes.tmp', '--ledger', 'hygiene-baseline.json'
@@ -192,8 +195,8 @@ test('ack：缺少 --reason 时不写入账本（理由是这个工具的核心�
   assert.ok(!fs.existsSync(ledger));
 });
 
-test('ack：未知路径报错并给出可选项', () => {
-  const dir = sandbox();
+test('ack：未知路径报错并给出可选项', (t) => {
+  const dir = sandbox(t);
   const ledger = path.join(dir, 'hygiene-baseline.json');
   const { code, err } = capture([
     'ack', '--root', path.join(dir, 'repo'), '--path', 'does/not/exist.md',
@@ -210,8 +213,8 @@ test('ack：未知路径报错并给出可选项', () => {
   assert.match(wrongRule.err, /hygiene\/temp-file/);
 });
 
-test('ack：snooze 默认 30 天，且明确写入 until', () => {
-  const dir = sandbox();
+test('ack：snooze 默认 30 天，且明确写入 until', (t) => {
+  const dir = sandbox(t);
   const ledger = path.join(dir, 'hygiene-baseline.json');
   const { code, err } = capture([
     'ack', '--root', path.join(dir, 'repo'), '--path', 'notes.tmp',
@@ -224,8 +227,8 @@ test('ack：snooze 默认 30 天，且明确写入 until', () => {
   assert.match(err, /豁免至/);
 });
 
-test('baseline --from：可从已有报告固化，不必重扫', () => {
-  const dir = sandbox();
+test('baseline --from：可从已有报告固化，不必重扫', (t) => {
+  const dir = sandbox(t);
   const reportFile = path.join(dir, 'r.json');
   capture(scanArgs(dir, ['--format', 'json', '--out', reportFile]), { cwd: dir });
   const ledger = path.join(dir, 'from-report.json');
@@ -234,8 +237,8 @@ test('baseline --from：可从已有报告固化，不必重扫', () => {
   assert.ok(loadLedger(ledger).entries.length > 0);
 });
 
-test('baseline --from：文件不存在时返回 2', () => {
-  const dir = sandbox();
+test('baseline --from：文件不存在时返回 2', (t) => {
+  const dir = sandbox(t);
   assert.equal(capture(['baseline', '--from', 'nope.json'], { cwd: dir }).code, 2);
 });
 

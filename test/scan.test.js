@@ -7,7 +7,7 @@
  *   3. 有 git 时时间证据真的来自 commit 而不是 mtime
  */
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,10 +21,13 @@ import { detectGit } from '../src/indexer.js';
 import { extractDates } from '../src/rules/stale-date.js';
 import { extractReferences, maskFencedBlocks } from '../src/refs.js';
 import { globToRegExp, matchesAny } from '../src/walk.js';
+import { createSandboxFactory } from './helpers/sandbox.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE = path.join(HERE, 'samples', 'messy');
 const NOW = Date.parse('2026-11-06T12:00:00Z');
+/** 所有临时仓库都建在同一根下，测试结束统一清理。 */
+const sandboxIn = createSandboxFactory(after);
 
 /**
  * 能否真的起 git 子进程并读回输出。
@@ -149,8 +152,8 @@ test('输出顺序稳定：按严重度、路径、行号排序', () => {
   }
 });
 
-test('符号检查：只在"看起来像代码引用"时触发', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aicg-symbol-'));
+test('符号检查：只在"看起来像代码引用"时触发', (t) => {
+  const dir = sandboxIn(t, 'symbol');
   fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'src', 'api.js'), [
@@ -179,8 +182,8 @@ test('符号检查：只在"看起来像代码引用"时触发', () => {
   assert.ok(!missing.some((m) => m.includes('`error`') || m.includes('：error')), '术语 `error` 不应当成代码符号');
 });
 
-test('默认忽略 fixtures 目录：样板数据不该被当成待治理对象', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aicg-ignore-'));
+test('默认忽略 fixtures 目录：样板数据不该被当成待治理对象', (t) => {
+  const dir = sandboxIn(t, 'ignore');
   fs.mkdirSync(path.join(dir, 'test', 'fixtures'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'test', 'fixtures', 'a.tmp'), 'x');
   fs.writeFileSync(path.join(dir, 'test', 'fixtures', 'b.tmp'), 'x');
@@ -260,8 +263,8 @@ test('账本：路径已不存在的条目被报告为可清理', () => {
   assert.equal(stale.path, 'already/gone.md');
 });
 
-test('账本读写：排序稳定、非法输入明确报错', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aicg-ledger-'));
+test('账本读写：排序稳定、非法输入明确报错', (t) => {
+  const dir = sandboxIn(t, 'ledger');
   const file = path.join(dir, 'hygiene-baseline.json');
   const ledger = emptyLedger();
   ledger.entries.push({ path: 'b.md', disposition: 'keep', reason: 'x' });
@@ -333,8 +336,8 @@ const GIT_DOC_DATE = '2026-01-01T00:00:00Z';
 const GIT_CODE_60D = '2026-03-02T00:00:00Z'; // 落后 60 天：只够触发文件级判定
 const GIT_CODE_150D = '2026-05-31T00:00:00Z'; // 落后 150 天：也够触发项目级回退
 
-function makeGitFixture(prefix) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+function makeGitFixture(t, label) {
+  const dir = sandboxIn(t, label);
   fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'docs', 'guide.md'), '# Guide\n\n调用 `handler`。\n');
@@ -342,8 +345,8 @@ function makeGitFixture(prefix) {
   return dir;
 }
 
-test('git：文档没写代码路径时，用项目级回退信号（阈值 90 天）', () => {
-  const dir = makeGitFixture('aicg-gitfake-');
+test('git：文档没写代码路径时，用项目级回退信号（阈值 90 天）', (t) => {
+  const dir = makeGitFixture(t, 'gitfake');
   const fakeTimes = {
     'docs/guide.md': Date.parse(GIT_DOC_DATE),
     'src/app.js': Date.parse(GIT_CODE_150D)
@@ -361,8 +364,8 @@ test('git：文档没写代码路径时，用项目级回退信号（阈值 90 �
   assert.ok(lag.evidence.includes('git'), '证据应标明时间来自 git');
 });
 
-test('git：项目级回退有独立阈值，60 天差距不该触发', () => {
-  const dir = makeGitFixture('aicg-gitfake-short-');
+test('git：项目级回退有独立阈值，60 天差距不该触发', (t) => {
+  const dir = makeGitFixture(t, 'gitfake-short');
   const fakeTimes = {
     'docs/guide.md': Date.parse(GIT_DOC_DATE),
     'src/app.js': Date.parse(GIT_CODE_60D)
@@ -379,8 +382,8 @@ test('git：项目级回退有独立阈值，60 天差距不该触发', () => {
   );
 });
 
-test('git：文档明确提到代码文件时按文件级差异判定', () => {
-  const dir = makeGitFixture('aicg-gitfake2-');
+test('git：文档明确提到代码文件时按文件级差异判定', (t) => {
+  const dir = makeGitFixture(t, 'gitfake-files');
   fs.writeFileSync(path.join(dir, 'docs', 'guide.md'), '# Guide\n\n实现见 `src/app.js`。\n');
 
   const fakeTimes = {
@@ -405,7 +408,7 @@ test('git：真实仓库端到端（环境不允许起子进程时跳过）', as
     t.skip('当前环境无法通过管道调用 git（沙箱限制），语义已由注入式用例覆盖');
     return;
   }
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aicg-git-'));
+  const dir = sandboxIn(t, 'git');
   const env = {
     ...process.env,
     GIT_AUTHOR_NAME: 't',
