@@ -8,7 +8,7 @@
 
 ```bash
 node --version        # 需要 >= 18
-node test/all.js      # 40 条用例，单进程执行，约 1.5 秒
+node test/all.js      # 41 条用例，单进程执行，约 1.5 秒
 node bin/aicg.js rules
 ```
 

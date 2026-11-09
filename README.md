@@ -144,7 +144,7 @@ ai-code-hygiene/
 ## 自检
 
 ```bash
-node test/all.js          # 40 条用例，单进程执行
+node test/all.js          # 41 条用例，单进程执行
 node bin/aicg.js scan --root test/samples/messy --now 2026-11-06T12:00:00Z
 ```
 
