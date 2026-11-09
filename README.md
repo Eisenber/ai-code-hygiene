@@ -1,5 +1,9 @@
 # ai-code-hygiene
 
+[![CI](https://github.com/Eisenber/ai-code-hygiene/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Eisenber/ai-code-hygiene/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+
 > 一个零依赖、可离线运行的"AI 产物清退"扫描器。
 > 它不替 AI 写代码，专管 AI 写完之后**留下的东西**：临时文件、重复文档、失效引用、过期说明、被删功能的残留。
 
@@ -162,6 +166,14 @@ node bin/aicg.js scan --root test/samples/messy --now 2026-11-06T12:00:00Z
 - **不识别中文分词级别的语义**：日期、版本号都是模式匹配，宁可漏报也不误报。
 - **不做自动修复**：改文档比删文件更容易引入隐性错误，这一步留给人。
 - **夹具目录整体跳过**：`fixtures`/`samples`/`testdata` 这类目录里的"脏"是测试数据，不是待治理对象；确需扫描时把这些名字从 `fixtureDirs` 里去掉。
+
+## 参与贡献
+
+- 想加一条规则？[CONTRIBUTING.md](CONTRIBUTING.md) 给了五步流程、finding 契约、severity 语义和提交前检查清单。
+- 想提规则提案（或指出误报）？用 [`规则提案`](.github/ISSUE_TEMPLATE/rule-proposal.yml) 模板。
+- 第一次贡献？从 [`good first issue`](https://github.com/Eisenber/ai-code-hygiene/issues/1) 开始，按 issue 里的步骤可以走通整条链路。
+
+一条规则的成败主要看**误报率**，而不是覆盖多少场景。找一份真实仓库试跑，比写十条用例更有说服力。
 
 ## 放进别的仓库
 

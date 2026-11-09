@@ -12,6 +12,7 @@
     "LICENSE"
   ],
   "engines": { "node": ">=18" },
+  "os": ["win32", "darwin", "linux"],
   "keywords": [
     "ai-generated-code",
     "documentation",
@@ -24,7 +25,8 @@
     "test": "node test/all.js",
     "scan": "node bin/aicg.js scan --root .",
     "scan:samples": "node bin/aicg.js scan --root test/samples/messy --now 2026-11-06T12:00:00Z",
-    "rules": "node bin/aicg.js rules"
+    "rules": "node bin/aicg.js rules",
+    "prepublishOnly": "node test/all.js"
   },
   "author": "Eisenber",
   "license": "MIT",
@@ -35,5 +37,8 @@
   "bugs": {
     "url": "https://github.com/Eisenber/ai-code-hygiene/issues"
   },
-  "homepage": "https://github.com/Eisenber/ai-code-hygiene#readme"
+  "homepage": "https://github.com/Eisenber/ai-code-hygiene#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
