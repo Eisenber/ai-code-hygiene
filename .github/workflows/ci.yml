@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22', '24']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run tests
+        run: node test/all.js
+
+      - name: CLI smoke test
+        run: |
+          node bin/aicg.js help > /dev/null
+          node bin/aicg.js rules
+
+      - name: Self-scan (must be clean)
+        run: |
+          set +e
+          node bin/aicg.js scan --root . --fail-on warn --no-color
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::error::项目自检未通过（exit $code）"
+            exit 1
+          fi
+
+      - name: Acceptance sample (must still flag its 2 known broken links)
+        run: |
+          set +e
+          out=$(node bin/aicg.js scan --root test/samples/messy --now 2026-11-06T12:00:00Z --no-color)
+          code=$?
+          set -e
+          echo "$out"
+          if [ "$code" -ne 1 ]; then
+            echo "::error::验收样例应返回 1（发现问题），实际 $code"
+            exit 1
+          fi
+          echo "$out" | grep -q 'ERROR (2)' || { echo "::error::样例应包含 2 条 error"; exit 1; }

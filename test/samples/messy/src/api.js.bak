@@ -1,0 +1,7 @@
+/**
+ * 备份文件，不应进入仓库。
+ */
+
+export function fetchLegacyUser(id) {
+  return { id, legacy: true, note: 'backup' };
+}

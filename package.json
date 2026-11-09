@@ -1,0 +1,39 @@
+{
+  "name": "ai-code-hygiene",
+  "version": "0.1.0",
+  "description": "扫描并清退 AI 写完后遗留的冗余代码与文档：临时文件、重复内容、失效引用、过期说明。零依赖。",
+  "type": "module",
+  "bin": { "aicg": "./bin/aicg.js" },
+  "files": [
+    "bin/",
+    "src/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": { "node": ">=18" },
+  "keywords": [
+    "ai-generated-code",
+    "documentation",
+    "cleanup",
+    "linter",
+    "technical-debt",
+    "cli"
+  ],
+  "scripts": {
+    "test": "node test/all.js",
+    "scan": "node bin/aicg.js scan --root .",
+    "scan:samples": "node bin/aicg.js scan --root test/samples/messy --now 2026-11-06T12:00:00Z",
+    "rules": "node bin/aicg.js rules"
+  },
+  "author": "Eisenber",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Eisenber/ai-code-hygiene.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Eisenber/ai-code-hygiene/issues"
+  },
+  "homepage": "https://github.com/Eisenber/ai-code-hygiene#readme"
+}

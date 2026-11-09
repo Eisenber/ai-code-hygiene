@@ -1,0 +1,13 @@
+{
+  "$comment": "项目自身的配置。只排除本仓库自己的东西：验收样例与文档举例。规则级的 excludeGlobs 同样作用于被扫描的其它目录，所以这里不写会波及外部树的宽泛模式。",
+  "ignore": [
+    "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "Cargo.lock",
+    "poetry.lock", "composer.lock", "*.min.js", "*.min.css", "*.map",
+    ".DS_Store", "Thumbs.db"
+  ],
+  "rules": {
+    "hygiene/broken-reference": {
+      "excludeGlobs": ["README.md", "docs/design.md"]
+    }
+  }
+}
