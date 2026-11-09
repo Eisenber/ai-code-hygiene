@@ -152,6 +152,27 @@ test('输出顺序稳定：按严重度、路径、行号排序', () => {
   }
 });
 
+test('符号检查：对象上的函数型成员也算已声明', (t) => {
+  const dir = sandboxIn(t, 'member');
+  fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'src', 'api.js'), [
+    'export const api = {',
+    '  isFixture: (rel) => rel.length > 0,',
+    '  read: function (x) { return x; },',
+    '  scan(rel) { return rel; }',
+    '};'
+  ].join('\n'));
+  fs.writeFileSync(
+    path.join(dir, 'docs', 'guide.md'),
+    '# 指南\n\n实现见 `src/api.js`：用 `isFixture(rel)` 判断，用 `read(x)` 读取，用 `scan(rel)` 扫描。\n'
+  );
+
+  const { report } = scan({ root: dir, now: NOW, useGit: false });
+  const broken = report.findings.filter((f) => f.rule === 'hygiene/broken-reference');
+  assert.deepEqual(broken, [], '成员方法已在源码中声明，不应报断链');
+});
+
 test('符号检查：只在"看起来像代码引用"时触发', (t) => {
   const dir = sandboxIn(t, 'symbol');
   fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });

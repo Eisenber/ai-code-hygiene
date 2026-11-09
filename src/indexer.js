@@ -42,21 +42,33 @@ export function hashContent(normalized) {
 }
 
 // --- 代码符号抽取 -------------------------------------------------------
-// 刻意只覆盖"顶层声明"的常见形态。正则做不到精确 AST，这里的目标是
-// "被删掉的导出名能被发现"，而不是语义分析；因此宁可漏，不可妄。
+// 刻意只覆盖常见声明形态，不做 AST。目标是"被删掉的名字能被发现"，
+// 因此宁可漏，不可妄：多收一个名字只会让断链少报，误报则会让整条规则不可信。
+//
+// 除顶层声明外，还收"函数型成员"（对象属性、类方法）。原因很实际：
+// 文档里会写 `isFixture(rel)` 这类 context 方法，若只索引顶层声明，
+// 这些真实存在的成员会被判成"符号不存在"——本项目自己的 CONTRIBUTING.md 就撞上过。
+
+/** 函数型成员：`name: (args) =>`、`name: function`、`name: arg =>`、类/对象里的简写方法 `name(args) {`。 */
+const MEMBER_FN_PATTERNS = [
+  /(?:^|\n)\s*(?:async\s+)?([A-Za-z_$][\w$]*)\s*:\s*(?:async\s+)?(?:function\b|\(|[A-Za-z_$][\w$]*\s*=>)/g,
+  /(?:^|\n)\s*(?:static\s+|async\s+|get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*\([^)\n]*\)\s*\{/g
+];
 
 const SYMBOL_PATTERNS = {
   js: [
     /(?:^|\n)\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/g,
     /(?:^|\n)\s*(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)/g,
     /(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g,
-    /(?:^|\n)\s*(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
+    /(?:^|\n)\s*(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)/g,
+    ...MEMBER_FN_PATTERNS
   ],
   ts: [
     /(?:^|\n)\s*(?:export\s+)?(?:declare\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)/g,
     /(?:^|\n)\s*(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)/g,
     /(?:^|\n)\s*(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)/g,
-    /(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g
+    /(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g,
+    ...MEMBER_FN_PATTERNS
   ],
   py: [
     /(?:^|\n)\s*(?:async\s+)?def\s+([A-Za-z_]\w*)/g,
